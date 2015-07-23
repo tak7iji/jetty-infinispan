@@ -18,13 +18,7 @@
 
 package org.eclipse.jetty.session.infinispan;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectStreamClass;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Map;
@@ -37,6 +31,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import javax.servlet.http.HttpServletRequest;
 
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Kryo.DefaultInstantiatorStrategy;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 
@@ -50,6 +45,7 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
 import org.infinispan.commons.api.BasicCache;
+import org.objenesis.strategy.StdInstantiatorStrategy;
 
 /**
  * InfinispanSessionManager
@@ -102,6 +98,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
     private ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>() {
         protected Kryo initialValue() {
             Kryo kryo = new Kryo();
+            kryo.setInstantiatorStrategy(new DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
             // configure kryo instance, customize settings
             return kryo;
         };
@@ -112,6 +109,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
     protected Scavenger _scavenger;
     protected long _scavengeIntervalMs = 1000L * 60 * 10; //10mins
     protected boolean _ownScheduler;
+    private int _maxRemoveSessions = 100;
     
     /**
      * Scavenger
@@ -686,7 +684,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
      */
     public void scavenge ()
     {
-        Set<String> candidateIds = new HashSet<String>();
+        Set<String> candidateIds = new HashSet<String>(_maxRemoveSessions);
         long now = System.currentTimeMillis();
 
         LOG.info("SessionManager for context {} scavenging at {} ", getContextPath(getContext()), now);
@@ -697,6 +695,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
                 long expiry = entry.getValue().getExpiry();
                 if (expiry > 0 && expiry < now)
                     candidateIds.add(entry.getKey());
+                if (candidateIds.size() > _maxRemoveSessions) break;
             }
         }
 
@@ -735,7 +734,13 @@ public class InfinispanSessionManager extends AbstractSessionManager
         }
     }
     
-    
+    public long getMaxRemoveSessions() {
+        return _maxRemoveSessions;
+    }
+
+    public void setMaxRemoveSessions(int maxRemoveSessions) {
+        this._maxRemoveSessions = maxRemoveSessions;
+    }
 
     public long getScavengeInterval ()
     {
