@@ -10,7 +10,7 @@
   <url>http://www.eclipse.org/jetty</url>
   <properties>
     <bundle-symbolic-name>${project.groupId}.infinispan</bundle-symbolic-name>
-    <infinispan.version>7.1.1.Final</infinispan.version>
+    <infinispan.version>[10.0.0,)</infinispan.version>
     <kryo.version>3.0.2</kryo.version>
   </properties>
   <build>
